@@ -3,7 +3,7 @@ import pdb
 import torch
 import torch.nn.functional as F
 from torch.nn import Sequential as Seq, Linear as Lin, ReLU
-from data.Indoor3DSemSegLoader.py import Indoor3DSemSeg
+from data.Indoor3DSemSegLoader import Indoor3DSemSeg
 import torch_geometric.transforms as T
 from torch_geometric.data import DataLoader, Data
 from torch_geometric.nn import PointConv, fps, radius, GraphConv, SGConv, GMMConv
@@ -23,13 +23,13 @@ class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.gmm_conv1 = GMMConv(3, 32, dim=3) #pseudo-coordinate dim
+        #self.gmm_conv1 = GMMConv(3, 32, dim=3) #pseudo-coordinate dim
+        self.gmm_conv1 = Lin(6, 32) #pseudo-coordinate dim
         self.pt_conv2 = Lin(32, 64)
 
         self.lin1 = Lin(64, 32)
-        self.lin2 = Lin(32, 16)
-        self.lin3 = Lin(16, 4) # types
-        self.lin4 = Lin(16, 3) # split or merge
+        self.lin2 = Lin(32, 128)
+        self.lin4 = Lin(128, 23) # split or merge
 
     def forward(self, data):
 
@@ -37,20 +37,20 @@ class Net(torch.nn.Module):
         #data = Data(edge_index=data.edge_index, pos=data.pos)
         #data = Polar(norm=True)(data)
         x, pos, batch = data.x, data.pos, data.batch
-        edge_index = data.edge_index#.cuda(0)
-        pos = pos.double()#.do()
+        #edge_index = data.edge_index
+        pos = pos.double()
         batch = batch.long()
 
-        x = F.relu(self.gmm_conv1(x.double(), edge_index, pos.double()))
+        #x = F.relu(self.gmm_conv1(x.double(), edge_index, pos.double()))
+        x = F.relu(self.gmm_conv1(x.double()))
         x = F.relu(self.pt_conv2(x))
 
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
         x = F.relu(self.lin2(x))
         x = F.dropout(x, p=0.5, training=self.training)
-        type_pred = self.lin3(x)
-        split_pred = self.lin4(x)
-        return F.log_softmax(type_pred, dim=-1), F.log_softmax(split_pred, dim=-1)
+        x = self.lin4(x)
+        return F.log_softmax(x, dim=-1)
 
 
 #device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -63,26 +63,27 @@ def train(epoch):
 
 
     for data in train_loader:
+        print(data)
         #data = data.to(device)
         optimizer.zero_grad()
+        
+        seg_pred = model(data)
+        print(seg_pred.shape)
 
-        type_pred, split_pred = model(data)
+        #if torch.sum(split_gt) == 0:
+        #    continue
+        #else:
+        #    print("type GT: ", torch.unique(split_gt))
 
-        split_gt = data.y[0, :].long()
-        type_gt = data.y[1, :].long()
-        if torch.sum(split_gt) == 0:
-            continue
-        else:
-            print("type GT: ", torch.unique(split_gt))
-
-        loss = F.nll_loss(split_pred, split_gt) + F.nll_loss(type_pred, type_gt)
-        if count % REPORT_RATE == 0:
-            print(epoch, loss.data.cpu(),flush=True)
-        loss.backward()
-        optimizer.step()
-        count = count + 1
+        #loss = F.nll_loss(split_pred, split_gt) + F.nll_loss(type_pred, type_gt)
+        #if count % REPORT_RATE == 0:
+        #    print(epoch, loss.data.cpu(),flush=True)
+        #loss.backward()
+        #optimizer.step()
+        #count = count + 1
 
 
+"""
 def test(loader):
     model.eval()
     correct_type = 0
@@ -106,9 +107,11 @@ def test(loader):
         correct_split += split_pred.eq(data.y[1,:].long()).sum().item()
         #pdb.set_trace()
     return correct_type / pt_size, correct_split / pt_size
+"""
 
 for epoch in range(1, 201):
+    pass
     train(epoch)
-    val_acc_type, val_acc_split = test(val_loader)
-    print(val_acc_type, val_acc_split)
+    #val_acc_type, val_acc_split = test(val_loader)
+    #print(val_acc_type, val_acc_split)
     #print('Epoch: {:02d}, Test: {:.4f}'.format(epoch, val_acc))
