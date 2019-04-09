@@ -13,10 +13,11 @@ from pdb import set_trace as bp
 from torch_geometric.nn import EdgeConv, knn_graph, global_max_pool
 
 REPORT_RATE = 100
+NUM_POINTS = 1024
 
 #pre_transform, transform = T.NormalizeScale(), T.SamplePoints(1024)
 
-dset = Indoor3DSemSeg(16, "./")
+dset = Indoor3DSemSeg(NUM_POINTS, "./")
 train_loader = DataLoader(dset, batch_size=32, shuffle=True)
 val_loader =   DataLoader(dset, batch_size=1, shuffle=False)
 
