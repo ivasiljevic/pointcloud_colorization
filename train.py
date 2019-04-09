@@ -63,24 +63,18 @@ def train(epoch):
 
 
     for data in train_loader:
-        print(data)
         #data = data.to(device)
         optimizer.zero_grad()
         
         seg_pred = model(data)
-        print(seg_pred.shape)
 
-        #if torch.sum(split_gt) == 0:
-        #    continue
-        #else:
-        #    print("type GT: ", torch.unique(split_gt))
+        loss = F.nll_loss(seg_pred, data.y)
 
-        #loss = F.nll_loss(split_pred, split_gt) + F.nll_loss(type_pred, type_gt)
-        #if count % REPORT_RATE == 0:
-        #    print(epoch, loss.data.cpu(),flush=True)
-        #loss.backward()
-        #optimizer.step()
-        #count = count + 1
+        if count % REPORT_RATE == 0:
+            print(epoch, loss.data.cpu(),flush=True)
+        loss.backward()
+        optimizer.step()
+        count = count + 1
 
 
 """
