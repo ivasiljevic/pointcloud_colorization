@@ -18,7 +18,7 @@ NUM_POINTS = 1024
 #pre_transform, transform = T.NormalizeScale(), T.SamplePoints(1024)
 
 dset = Indoor3DSemSeg(NUM_POINTS, "./")
-train_loader = DataLoader(dset, batch_size=32, shuffle=True)
+train_loader = DataLoader(dset, batch_size=8, shuffle=True)
 val_loader =   DataLoader(dset, batch_size=1, shuffle=False)
 
 
@@ -55,7 +55,6 @@ class Net(torch.nn.Module):
         bsize = batch[-1].item() + 1
         edge_index = knn_graph(pos, k=30, batch=batch)
         x1 = self.conv1(pos, edge_index)
-
         edge_index = knn_graph(x1, k=30, batch=batch)
         x2 = self.conv2(x1, edge_index)
 
