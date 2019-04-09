@@ -9,7 +9,8 @@ from torch_geometric.data import DataLoader, Data
 from torch_geometric.nn import PointConv, fps, radius, GraphConv, SGConv, GMMConv
 from torch_geometric.transforms import Polar
 import numpy as np
-
+from pdb import set_trace as bp
+from torch_geometric.nn import EdgeConv, knn_graph, global_max_pool
 REPORT_RATE = 10
 
 #pre_transform, transform = T.NormalizeScale(), T.SamplePoints(1024)
@@ -19,42 +20,56 @@ train_loader = DataLoader(dset, batch_size=32, shuffle=True)
 #val_dataset = Skeletron(root = '/share/data/vision-greg/ivas/proj/skeletron/data')
 #val_loader =   DataLoader(val_dataset, batch_size=1, shuffle=False)
 
+
 class Net(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, num_classes):
         super(Net, self).__init__()
 
-        #self.gmm_conv1 = GMMConv(3, 32, dim=3) #pseudo-coordinate dim
-        self.gmm_conv1 = Lin(6, 32) #pseudo-coordinate dim
-        self.pt_conv2 = Lin(32, 64)
+        nn = Seq(Lin(6, 64), ReLU(), Lin(64, 64), ReLU(), Lin(64, 64), ReLU())
+        self.conv1 = EdgeConv(nn, aggr='max')
 
-        self.lin1 = Lin(64, 32)
-        self.lin2 = Lin(32, 128)
-        self.lin4 = Lin(128, 23) # split or merge
+        nn = Seq(
+            Lin(128, 128), ReLU(), Lin(128, 128), ReLU(), Lin(128, 256),
+            ReLU())
+        self.conv2 = EdgeConv(nn, aggr='max')
+
+        self.lin0 = Lin(256, 512)
+
+        self.lin1 = Lin(512, 256)
+        self.lin2 = Lin(256, 256)
+        self.lin3 = Lin(256, num_classes)
 
     def forward(self, data):
 
-        #batch = data.batch
-        #data = Data(edge_index=data.edge_index, pos=data.pos)
-        #data = Polar(norm=True)(data)
-        x, pos, batch = data.x, data.pos, data.batch
-        #edge_index = data.edge_index
-        pos = pos.double()
-        batch = batch.long()
 
-        #x = F.relu(self.gmm_conv1(x.double(), edge_index, pos.double()))
-        x = F.relu(self.gmm_conv1(x.double()))
-        x = F.relu(self.pt_conv2(x))
+        t, pos, batch = data.x, data.pos, data.batch
+        #edge_index = data.edge_index
+        # pos = pos.double()
+        # batch = batch.long()
+        # bp()
+        edge_index = knn_graph(pos, k=20, batch=batch)
+        x = self.conv1(pos, edge_index)
+
+        edge_index = knn_graph(x, k=20, batch=batch)
+        x = self.conv2(x, edge_index)
+
+        x = F.relu(self.lin0(x))
+
+        # x = global_max_pool(x, batch)
 
         x = F.relu(self.lin1(x))
-        x = F.dropout(x, p=0.5, training=self.training)
         x = F.relu(self.lin2(x))
         x = F.dropout(x, p=0.5, training=self.training)
-        x = self.lin4(x)
+        x = self.lin3(x)
         return F.log_softmax(x, dim=-1)
 
 
-#device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Net().double()#.float()#to(device)
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# model = Net(23).double()#.float()#to(device)
+num_classes = 23
+model = Net(23).to(device)
+
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 def train(epoch):
@@ -63,7 +78,7 @@ def train(epoch):
 
 
     for data in train_loader:
-        #data = data.to(device)
+        data = data.to(device)
         optimizer.zero_grad()
         
         seg_pred = model(data)
