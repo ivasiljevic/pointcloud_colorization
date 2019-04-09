@@ -18,7 +18,7 @@ NUM_POINTS = 1024
 #pre_transform, transform = T.NormalizeScale(), T.SamplePoints(1024)
 
 dset = Indoor3DSemSeg(NUM_POINTS, "./")
-dset_val = Indoor3DSemSeg(NUM_POINTS, train=False, "./")
+dset_val = Indoor3DSemSeg(NUM_POINTS, "./", train=False)
 train_loader = DataLoader(dset, batch_size=8, shuffle=True)
 val_loader =   DataLoader(dset_val, batch_size=1, shuffle=False)
 
