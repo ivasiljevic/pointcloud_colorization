@@ -11,14 +11,14 @@ from torch_geometric.transforms import Polar
 import numpy as np
 from pdb import set_trace as bp
 from torch_geometric.nn import EdgeConv, knn_graph, global_max_pool
-REPORT_RATE = 10
+
+REPORT_RATE = 100
 
 #pre_transform, transform = T.NormalizeScale(), T.SamplePoints(1024)
 
 dset = Indoor3DSemSeg(16, "./")
 train_loader = DataLoader(dset, batch_size=32, shuffle=True)
-#val_dataset = Skeletron(root = '/share/data/vision-greg/ivas/proj/skeletron/data')
-#val_loader =   DataLoader(val_dataset, batch_size=1, shuffle=False)
+val_loader =   DataLoader(dset, batch_size=1, shuffle=False)
 
 
 class Net(torch.nn.Module):
@@ -43,14 +43,16 @@ class Net(torch.nn.Module):
 
 
         t, pos, batch = data.x, data.pos, data.batch
+        pos = pos.cuda()
+
         #edge_index = data.edge_index
         # pos = pos.double()
         # batch = batch.long()
         # bp()
-        edge_index = knn_graph(pos, k=20, batch=batch)
+        edge_index = knn_graph(pos, k=20, batch=batch).cuda()
         x = self.conv1(pos, edge_index)
 
-        edge_index = knn_graph(x, k=20, batch=batch)
+        edge_index = knn_graph(x, k=20, batch=batch).cuda()
         x = self.conv2(x, edge_index)
 
         x = F.relu(self.lin0(x))
@@ -66,7 +68,7 @@ class Net(torch.nn.Module):
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# model = Net(23).double()#.float()#to(device)
+#model = Net(23)#.float()#to(device)
 num_classes = 23
 model = Net(23).to(device)
 
@@ -92,7 +94,7 @@ def train(epoch):
         count = count + 1
 
 
-"""
+
 def test(loader):
     model.eval()
     correct_type = 0
@@ -104,23 +106,18 @@ def test(loader):
         #data = data.to(device)
         with torch.no_grad():
             #pred = model(data).max(1)[1]
-            type_pred, split_pred = model(data)
+            pred = model(data)
 
-            type_pred = type_pred.max(1)[1].long()
-            split_pred = split_pred.max(1)[1].long()
+            pred = pred.max(1)[1].long()
 
         #print(data.y.shape)
-        correct_type += type_pred.eq(data.y[0,:].long()).sum().item()
-        pt_size += split_pred.shape[0]
+        correct_type += pred.eq(data.y[0,:].long()).sum().item()
+        pt_size += pred.shape[0]
         #print(split_pred.eq(data.y[1,:].long()).sum().item())
-        correct_split += split_pred.eq(data.y[1,:].long()).sum().item()
-        #pdb.set_trace()
-    return correct_type / pt_size, correct_split / pt_size
-"""
+    return correct_type / pt_size
+
 
 for epoch in range(1, 201):
-    pass
     train(epoch)
-    #val_acc_type, val_acc_split = test(val_loader)
-    #print(val_acc_type, val_acc_split)
-    #print('Epoch: {:02d}, Test: {:.4f}'.format(epoch, val_acc))
+    val_acc = test(val_loader)
+    print('Epoch: {:02d}, Test: {:.4f}'.format(epoch, val_acc))
