@@ -44,6 +44,8 @@ class Net(torch.nn.Module):
 
         t, pos, batch = data.x, data.pos, data.batch
         pos = pos.cuda()
+        batch = batch.cuda()
+        t = t.cuda()
 
         #edge_index = data.edge_index
         # pos = pos.double()
@@ -107,15 +109,14 @@ def test(loader):
     pt_size = 0
 
     for data in loader:
-        #data = data.to(device)
+        data = data.to(device)
         with torch.no_grad():
             #pred = model(data).max(1)[1]
             pred = model(data)
-
             pred = pred.max(1)[1].long()
 
         #print(data.y.shape)
-        correct_type += pred.eq(data.y[0,:].long()).sum().item()
+        correct_type += pred.eq(data.y.long()).sum().item()
         pt_size += pred.shape[0]
         #print(split_pred.eq(data.y[1,:].long()).sum().item())
     return correct_type / pt_size
