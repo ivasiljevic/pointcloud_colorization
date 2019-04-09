@@ -35,7 +35,7 @@ class Net(torch.nn.Module):
 
         self.lin0 = Lin(256, 512)
 
-        self.lin1 = Lin(512, 256)
+        self.lin1 = Lin(832, 256)
         self.lin2 = Lin(256, 256)
         self.lin3 = Lin(256, num_classes)
 
@@ -46,18 +46,22 @@ class Net(torch.nn.Module):
         #edge_index = data.edge_index
         # pos = pos.double()
         # batch = batch.long()
-        # bp()
-        edge_index = knn_graph(pos, k=20, batch=batch)
-        x = self.conv1(pos, edge_index)
+        dsize = pos.size()[0]
+        bsize = batch[-1].item() + 1
+        edge_index = knn_graph(pos, k=30, batch=batch)
+        x1 = self.conv1(pos, edge_index)
 
-        edge_index = knn_graph(x, k=20, batch=batch)
-        x = self.conv2(x, edge_index)
+        edge_index = knn_graph(x1, k=30, batch=batch)
+        x2 = self.conv2(x1, edge_index)
 
-        x = F.relu(self.lin0(x))
+        x2max = F.relu(self.lin0(x2))
 
-        # x = global_max_pool(x, batch)
+        x2max = global_max_pool(x2max, batch)
+        globalfeats = x2max.repeat(1,int(dsize/bsize)).view(dsize, x2max.size()[1])
 
-        x = F.relu(self.lin1(x))
+        concat_features = torch.cat((x1,x2, globalfeats), dim=1)
+
+        x = F.relu(self.lin1(concat_features))
         x = F.relu(self.lin2(x))
         x = F.dropout(x, p=0.5, training=self.training)
         x = self.lin3(x)
