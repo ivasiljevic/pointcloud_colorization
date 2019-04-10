@@ -143,6 +143,7 @@ def train(epoch):
 
 def test(loader):
     model.eval()
+    clsfier.eval()
     correct_type = 0
     correct_split = 0
 
@@ -153,6 +154,7 @@ def test(loader):
         with torch.no_grad():
             #pred = model(data).max(1)[1]
             pred = model(data)
+            pred = clsfier(pred)
             pred = pred.max(1)[1].long()
 
         #print(data.y.shape)
