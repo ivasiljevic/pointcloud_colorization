@@ -27,7 +27,6 @@ train_dataset = ModelNet(path, '40', True, transform, pre_transform)
 test_dataset = ModelNet(path, '40', False, transform, pre_transform)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-"""
 
 
 class Net(torch.nn.Module):
@@ -97,6 +96,7 @@ class classifier(torch.nn.Module):
         self.cls = Lin(256, num_classes)
 
     def forward(self, x):
+        x2max = global_max_pool(x2max, x.size()[0])
         x = self.cls(x)
         return F.log_softmax(x, dim=-1)
 
@@ -105,11 +105,11 @@ class classifier(torch.nn.Module):
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 #model = Net(23)#.float()#to(device)
-num_classes = 3
-#model = Net(num_classes).to(device)
-model = torch.load("basemodel.pkl")
-reg = torch.load("reg.pkl")
-#reg = regressor(num_classes).to(device)
+num_classes = 40
+model = Net(num_classes).to(device)
+# model = torch.load("basemodel.pkl")
+# reg = torch.load("reg.pkl")
+clsfier = classifier(num_classes).to(device)
 
 optimizer = torch.optim.Adam([{'params': reg.parameters()},{'params': model.parameters()}], lr=LR_RATE)
 MSEloss = nn.MSELoss()
@@ -132,11 +132,11 @@ def train(epoch):
 
         optimizer.zero_grad()
         
-        color_pred = model(data)
-        color_pred = reg(color_pred)
+        cls_pred = model(data)
+        cls_pred = clsfier(cls_pred)
         # bp()
-        # loss = F.nll_loss(seg_pred, data.y)
-        loss = MSEloss(color_pred,lbllab)
+        loss = F.nll_loss(cls_pred, data.y)
+        # loss = MSEloss(color_pred,lbllab)
 
         if count % REPORT_RATE == 0:
             print(epoch, loss.data.cpu(),flush=True)
@@ -169,8 +169,8 @@ def test(loader):
 
 for epoch in range(1, 201):
     train(epoch)
-    torch.save(model,"basemodel_ft.pkl")
-    torch.save(reg,"reg_ft.pkl")
+    torch.save(model,"basemodel_ft_model40.pkl")
+    torch.save(clsfier,"reg_ft_model40.pkl")
     # val_acc = test(val_loader)
     # print('Epoch: {:02d}, Test: {:.4f}'.format(epoch, val_acc))
-"""
+
